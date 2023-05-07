@@ -1,4 +1,3 @@
-User
 import Head from 'next/head';
 import { useEffect } from 'react';
 import { getPostBySlug } from 'lib/posts';
@@ -11,7 +10,6 @@ export default function PostRedirect({ post }) {
 
   return (
     <Head>
-      <title>Redirecting to WordPress post</title>
       <meta name="robots" content="noindex, nofollow" />
       <meta property="og:type" content="article" />
       <meta property="og:title" content={post.metaTitle || post.title} />
@@ -32,12 +30,11 @@ export default function PostRedirect({ post }) {
   );
 }
 
-export async function getServerSideProps({ params }) {
+export async function getStaticProps({ params }) {
   const { post } = await getPostBySlug(params.slug);
 
   if (!post) {
     return {
-      props: {},
       notFound: true,
     };
   }
