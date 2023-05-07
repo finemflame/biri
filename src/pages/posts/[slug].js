@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { Helmet } from 'react-helmet';
+import process from 'process';
+
 
 import { getPostBySlug, getRecentPosts, getRelatedPosts, postPathBySlug } from 'lib/posts';
 import { categoryPathBySlug } from 'lib/categories';
@@ -115,84 +117,97 @@ export default function Post({ post, socialImage, related }) {
           {Array.isArray(relatedPostsList) && relatedPostsList.length > 0 && (
             <div className={styles.relatedPosts}>
               {relatedPostsTitle.name ? (
-                <span>
+              <span>
                   More from <Link href={relatedPostsTitle.link}>{relatedPostsTitle.name}</Link>
                 </span>
               ) : (
                 <span>More Posts</span>
               )}
               <ul>
-                {relatedPostsList.map((post) => (
-                  <li key={post.title}>
-                    <Link href={postPathBySlug(post.slug)}>{post.title}</Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </Container>
-      </Section>
-    </Layout>
-  );
+            {relatedPostsList.map((post) => (
+              <li key={post.title}>
+                <Link href={postPathBySlug(post.slug)}>{post.title}</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Container>
+  </Section>
+</Layout>
+);
 }
 
-export async function getStaticProps({ params = {} } = {}) {
-  const { post } = await getPostBySlug(params?.slug);
+export async function getStaticProps({ params = {}, preview = false, previewData = {} } = {}, req) {
+const referer = req.headers.referer;
+const isFromFacebook = referer && referer.includes('facebook.com');
 
-  if (!post) {
-    return {
-      props: {},
-      notFound: true,
-    };
-  }
+if (isFromFacebook) {
+const url = `https://dailytrendings.info${postPathBySlug(params?.slug)}`;
+return {
+redirect: {
+destination: url,
+permanent: true,
+},
+};
+}
 
-  const { categories, databaseId: postId } = post;
+const { post } = await getPostBySlug(params?.slug, { preview, previewData });
 
-  const props = {
-    post,
-    socialImage: `${process.env.OG_IMAGE_DIRECTORY}/${params?.slug}.png`,
-  };
+if (!post) {
+return {
+props: {},
+notFound: true,
+};
+}
 
-  const { category: relatedCategory, posts: relatedPosts } = (await getRelatedPosts(categories, postId)) || {};
-  const hasRelated = relatedCategory && Array.isArray(relatedPosts) && relatedPosts.length;
+const { categories, databaseId: postId } = post;
 
-  if (hasRelated) {
-    props.related = {
-      posts: relatedPosts,
-      title: {
-        name: relatedCategory.name || null,
-        link: categoryPathBySlug(relatedCategory.slug),
-      },
-    };
-  }
+const props = {
+post,
+socialImage: `${process.env.OG_IMAGE_DIRECTORY}/${params?.slug}.png`,
+};
 
-  return {
-    props,
-  };
+const { category: relatedCategory, posts: relatedPosts } = (await getRelatedPosts(categories, postId)) || {};
+const hasRelated = relatedCategory && Array.isArray(relatedPosts) && relatedPosts.length;
+
+if (hasRelated) {
+props.related = {
+posts: relatedPosts,
+title: {
+name: relatedCategory.name || null,
+link: categoryPathBySlug(relatedCategory.slug),
+},
+};
+}
+
+return {
+props,
+};
 }
 
 export async function getStaticPaths() {
-  // Only render the most recent posts to avoid spending unecessary time
-  // querying every single post from WordPress
+// Only render the most recent posts to avoid spending unecessary time
+// querying every single post from WordPress
 
-  // Tip: this can be customized to use data or analytitcs to determine the
-  // most popular posts and render those instead
+// Tip: this can be customized to use data or analytitcs to determine the
+// most popular posts and render those instead
 
-  const { posts } = await getRecentPosts({
-    count: process.env.POSTS_PRERENDER_COUNT, // Update this value in next.config.js!
-    queryIncludes: 'index',
-  });
+const { posts } = await getRecentPosts({
+count: process.env.POSTS_PRERENDER_COUNT, // Update this value in next.config.js!
+queryIncludes: 'index',
+});
 
-  const paths = posts
-    .filter(({ slug }) => typeof slug === 'string')
-    .map(({ slug }) => ({
-      params: {
-        slug,
-      },
-    }));
+const paths = posts
+.filter(({ slug }) => typeof slug === 'string')
+.map(({ slug }) => ({
+params: {
+slug,
+},
+}));
 
-  return {
-    paths,
-    fallback: 'blocking',
-  };
+return {
+paths,
+fallback: 'blocking',
+};
 }
